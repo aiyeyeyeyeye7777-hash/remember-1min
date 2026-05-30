@@ -45,6 +45,8 @@ export interface GameState {
   paused: boolean;
   /** 本回合是否已经使用过暂停 */
   pauseUsed: boolean;
+  /** 本回合倒计时是否已经由玩家第一句话启动 */
+  timerStarted: boolean;
   /** AI 正在"思考/打字" */
   thinking: boolean;
   cleared: boolean;
@@ -61,8 +63,13 @@ export function useGame(level: LevelScript) {
   const [thinking, setThinking] = useState(false);
   const [paused, setPaused] = useState(false);
   const [pauseUsed, setPauseUsed] = useState(false);
+  const [timerStarted, setTimerStarted] = useState(false);
   const [justReset, setJustReset] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const roundEndsAtRef = useRef<number>(Date.now() + level.memorySeconds * 1000);
+  const pauseStartedAtRef = useRef<number | null>(null);
+  const thinkingPauseStartedAtRef = useRef<number | null>(null);
+  const resettingRef = useRef(false);
 
   const saveRef = useRef(save);
   saveRef.current = save;
@@ -72,10 +79,50 @@ export function useGame(level: LevelScript) {
   unlockedLockIdsRef.current = unlockedLockIds;
   const trustRef = useRef(trust);
   trustRef.current = trust;
+  const timeLeftRef = useRef(timeLeft);
+  timeLeftRef.current = timeLeft;
   const clearedRef = useRef(save.cleared);
   clearedRef.current = save.cleared;
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
+  const thinkingRef = useRef(thinking);
+  thinkingRef.current = thinking;
+  const timerStartedRef = useRef(timerStarted);
+  timerStartedRef.current = timerStarted;
+
+  function getDisplayedTimeLeft() {
+    return Math.max(0, Math.ceil((roundEndsAtRef.current - Date.now()) / 1000));
+  }
+
+  function startRoundTimer() {
+    if (timerStartedRef.current) return;
+    timerStartedRef.current = true;
+    setTimerStarted(true);
+    roundEndsAtRef.current = Date.now() + timeLeftRef.current * 1000;
+  }
+
+  function resumeManualPause() {
+    if (pauseStartedAtRef.current === null) return;
+    roundEndsAtRef.current += Date.now() - pauseStartedAtRef.current;
+    pauseStartedAtRef.current = null;
+    pausedRef.current = false;
+    setPaused(false);
+    setTimeLeft(getDisplayedTimeLeft());
+  }
+
+  function beginThinkingPause() {
+    if (!timerStartedRef.current || thinkingPauseStartedAtRef.current !== null) {
+      return;
+    }
+    thinkingPauseStartedAtRef.current = Date.now();
+  }
+
+  function endThinkingPause() {
+    if (thinkingPauseStartedAtRef.current === null) return;
+    roundEndsAtRef.current += Date.now() - thinkingPauseStartedAtRef.current;
+    thinkingPauseStartedAtRef.current = null;
+    setTimeLeft(getDisplayedTimeLeft());
+  }
 
   function getEffectiveUnlockedLockIds(ownedKeyIds: string[], roundLockIds: string[]) {
     return Array.from(
@@ -96,6 +143,13 @@ export function useGame(level: LevelScript) {
     setUnlockedLockIds([]);
     setTrust(getBaseTrust(level, loaded.ownedKeyIds));
     setTimeLeft(level.memorySeconds);
+    roundEndsAtRef.current = Date.now() + level.memorySeconds * 1000;
+    pauseStartedAtRef.current = null;
+    thinkingPauseStartedAtRef.current = null;
+    timerStartedRef.current = false;
+    setPaused(false);
+    setPauseUsed(false);
+    setTimerStarted(false);
     setHydrated(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [level.id]);
@@ -106,6 +160,12 @@ export function useGame(level: LevelScript) {
     setUnlockedLockIds([]);
     setPaused(false);
     setPauseUsed(false);
+    setTimerStarted(false);
+    timerStartedRef.current = false;
+    resettingRef.current = false;
+    roundEndsAtRef.current = Date.now() + level.memorySeconds * 1000;
+    pauseStartedAtRef.current = null;
+    thinkingPauseStartedAtRef.current = null;
     const baseTrust = getBaseTrust(level, saveRef.current.ownedKeyIds);
     setTrust(baseTrust);
     setTimeLeft(level.memorySeconds);
@@ -147,20 +207,33 @@ export function useGame(level: LevelScript) {
     if (!hydrated) return;
     if (clearedRef.current) return;
 
-    const t = window.setInterval(() => {
-      if (pausedRef.current) return;
+    const tick = () => {
+      if (
+        !timerStartedRef.current ||
+        pausedRef.current ||
+        thinkingRef.current ||
+        thinkingPauseStartedAtRef.current !== null
+      ) {
+        return;
+      }
 
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          // 放到下一帧执行 reset,避免在 setState 里再 setState
-          window.setTimeout(() => {
-            if (!clearedRef.current) resetMemory();
-          }, 0);
-          return level.memorySeconds; // 视觉上立即回满
-        }
-        return prev - 1;
-      });
-    }, 1000);
+      const nextTimeLeft = getDisplayedTimeLeft();
+
+      setTimeLeft(nextTimeLeft);
+
+      if (nextTimeLeft <= 0) {
+        timerStartedRef.current = false;
+        setTimerStarted(false);
+        if (resettingRef.current) return;
+        resettingRef.current = true;
+        window.setTimeout(() => {
+          if (!clearedRef.current) resetMemory();
+        }, 0);
+      }
+    };
+
+    tick();
+    const t = window.setInterval(tick, 250);
 
     return () => window.clearInterval(t);
   }, [hydrated, resetMemory, level.memorySeconds]);
@@ -169,11 +242,14 @@ export function useGame(level: LevelScript) {
   const send = useCallback(
     (raw: string) => {
       const text = raw.trim();
-      if (!text || thinking || clearedRef.current) return;
+      if (!text || thinkingRef.current || clearedRef.current) return;
 
-      if (pausedRef.current) setPaused(false);
+      startRoundTimer();
+      resumeManualPause();
       setMessages((m) => [...m, mkMsg("me", text)]);
+      thinkingRef.current = true;
       setThinking(true);
+      beginThinkingPause();
 
       const ownedKeyIds = saveRef.current.ownedKeyIds;
       const curLocks = getEffectiveUnlockedLockIds(
@@ -182,6 +258,7 @@ export function useGame(level: LevelScript) {
       );
 
       requestChatReply({
+        levelId: level.id,
         input: text,
         messages: messagesRef.current,
         unlockedLockIds: curLocks,
@@ -189,6 +266,7 @@ export function useGame(level: LevelScript) {
         currentTrust: trustRef.current,
       })
         .then((result) => {
+          endThinkingPause();
           setTrust(result.nextTrust);
           if (result.unlockedLock) {
             const lock = result.unlockedLock;
@@ -226,17 +304,20 @@ export function useGame(level: LevelScript) {
             });
           }
 
+          thinkingRef.current = false;
           setThinking(false);
         })
         .catch(() => {
+          endThinkingPause();
           setMessages((m) => [
             ...m,
             mkMsg("ai", "……信号断了一下。你能再说一遍吗?"),
           ]);
+          thinkingRef.current = false;
           setThinking(false);
         });
     },
-    [thinking]
+    []
   );
 
   // 重新开始(清空存档)
@@ -248,16 +329,31 @@ export function useGame(level: LevelScript) {
     setUnlockedLockIds([]);
     setTrust(getBaseTrust(level, fresh.ownedKeyIds));
     setTimeLeft(level.memorySeconds);
+    roundEndsAtRef.current = Date.now() + level.memorySeconds * 1000;
+    pauseStartedAtRef.current = null;
+    thinkingPauseStartedAtRef.current = null;
+    timerStartedRef.current = false;
     setThinking(false);
     setPaused(false);
     setPauseUsed(false);
+    setTimerStarted(false);
   }, [level.id, level.greeting, level.memorySeconds]);
 
   const pauseTimer = useCallback(() => {
-    if (pauseUsed || paused || thinking || saveRef.current.cleared) return;
+    if (
+      !timerStartedRef.current ||
+      pauseUsed ||
+      pausedRef.current ||
+      thinkingRef.current ||
+      saveRef.current.cleared
+    ) {
+      return;
+    }
+    pauseStartedAtRef.current = Date.now();
+    pausedRef.current = true;
     setPaused(true);
     setPauseUsed(true);
-  }, [pauseUsed, paused, thinking]);
+  }, [pauseUsed]);
 
   const effectiveUnlockedLockIds = getEffectiveUnlockedLockIds(
     save.ownedKeyIds,
@@ -275,6 +371,7 @@ export function useGame(level: LevelScript) {
     timeLeft,
     paused,
     pauseUsed,
+    timerStarted,
     thinking,
     cleared: save.cleared,
     justReset,

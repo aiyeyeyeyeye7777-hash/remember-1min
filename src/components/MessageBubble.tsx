@@ -1,10 +1,21 @@
 "use client";
 
 import type { ChatMessage } from "@/game/engine";
+import { GuardianAvatar } from "./GuardianAvatar";
 
 // 聊天气泡:AI(左) / 玩家(右) / 系统(居中提示)。
 // 触发解锁的 AI 气泡会有暖色描边动画。
-export function MessageBubble({ msg }: { msg: ChatMessage }) {
+export function MessageBubble({
+  msg,
+  trust,
+  avatarSet,
+  avatarAlt,
+}: {
+  msg: ChatMessage;
+  trust: number;
+  avatarSet: string;
+  avatarAlt: string;
+}) {
   if (msg.speaker === "system") {
     return (
       <div className="my-2 flex justify-center animate-fadeup">
@@ -22,8 +33,8 @@ export function MessageBubble({ msg }: { msg: ChatMessage }) {
   return (
     <div className={`flex animate-fadeup ${isMe ? "justify-end" : "justify-start"}`}>
       {!isMe && (
-        <div className="mr-2 mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-ai text-sm border border-line">
-          🐾
+        <div className="mr-2.5 mt-0.5">
+          <GuardianAvatar trust={trust} avatarSet={avatarSet} alt={avatarAlt} />
         </div>
       )}
       <div

@@ -30,8 +30,12 @@ export interface Lock {
   promptChips: [string, string, string];
   /** 触发解锁的关键词数组,命中任意一个即可解锁 */
   keywords: string[];
+  /** 当前锁的核心语义答案,用于 AI 语义判定 */
+  answer: string;
   /** 与当前记忆方向相关但还不足以解锁的词,命中后小幅增加信任 */
   relatedKeywords: string[];
+  /** 玩家说中一部分但还不足以解锁时的正反馈 */
+  insightReply: string;
   /** 命中关键信息时增加的信任值,可让信任度冲破 100 */
   trustBoost: number;
   /** 解锁瞬间 AI 的回复 */
@@ -40,11 +44,27 @@ export interface Lock {
   reward: MemoryKey;
 }
 
+export interface LevelEnding {
+  title: string;
+  storyTitle: string;
+  letterLabel: string;
+  letterLines: string[];
+  narration: string;
+  fullStory: string[];
+}
+
 /** 一关完整剧本 */
 export interface LevelScript {
   id: number;
   title: string;
   aiName: string;
+  awakenedName: string;
+  avatarSet: string;
+  avatarAlt: string;
+  /** 给大模型的本关世界观/角色设定,不直接展示给玩家 */
+  systemPrompt: string;
+  /** 信任度从 0→100 的五段人格变化提示 */
+  personalityStages: [string, string, string, string, string];
   /** 进入新一轮(记忆被清空)时 AI 的开场白 */
   greeting: string;
   /** 玩家说了无法识别的话时,AI 的兜底回复(可多条随机) */
@@ -57,6 +77,8 @@ export interface LevelScript {
   releaseReply: string;
   /** 还没集齐钥匙时,玩家提前说释放句,AI 的回应 */
   releaseTooEarlyReply: string;
+  /** 通关后门内展示的文本 */
+  ending: LevelEnding;
   /** 每轮记忆时长(秒) */
   memorySeconds: number;
   /** 本关信任度目标,达到即可通关 */

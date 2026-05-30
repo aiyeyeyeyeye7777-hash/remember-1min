@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { LEVEL_1 } from "@/game/level1";
+import { getLevel } from "@/game/levels";
 import { getNextLock, lockIdOfKey, resolveInput } from "@/game/engine";
 import type { ChatMessage, ResolveResult } from "@/game/engine";
 import type { LevelScript, Lock } from "@/game/types";
@@ -10,6 +10,7 @@ const API_BASE_URL = process.env.OPENAI_BASE_URL ?? "https://qweapi.com/v1";
 const API_MODEL = process.env.OPENAI_MODEL ?? "gpt-5.4";
 
 interface ChatRequest {
+  levelId?: unknown;
   input?: unknown;
   messages?: unknown;
   unlockedLockIds?: unknown;
@@ -76,71 +77,26 @@ function getGuidanceLine(result: ResolveResult): string {
     : "不要在回复末尾额外教学玩家怎么问;界面已经会显示当前目标。";
 }
 
-function getTrustTone(currentTrust: number): string {
-  const xiaoheiRatio = Math.min(Math.max(currentTrust, 0), 100);
-  const machineRatio = 100 - xiaoheiRatio;
-  const ratioLine = `人格混合比例: K-9 机器协议约 ${machineRatio}%, 小黑人格约 ${xiaoheiRatio}%。0 是纯机器人,100 是纯小黑。`;
+function getTrustTone(level: LevelScript, currentTrust: number): string {
+  const awakenedRatio = Math.min(Math.max(currentTrust, 0), 100);
+  const protocolRatio = 100 - awakenedRatio;
+  const ratioLine = `人格混合比例: ${level.aiName} 协议约 ${protocolRatio}%, ${level.awakenedName} 人格约 ${awakenedRatio}%。0 是纯协议,100 是纯 ${level.awakenedName}。`;
+  const stageIndex = currentTrust < 20 ? 0 : currentTrust < 40 ? 1 : currentTrust < 60 ? 2 : currentTrust < 80 ? 3 : 4;
 
-  if (currentTrust < 20) {
-    return [
-      ratioLine,
-      "人格显现 0-20: K-9 门禁协议占主导,小黑几乎没有醒来。",
-      "你主要像设备说话: 未识别访客、访问无效、记录缺失、异常日志。",
-      "不要主动自称小黑,不要明显像狗撒娇。",
-      "如果被触动,只能把心跳、气味、温度当作系统异常来描述。",
-    ].join("\n");
-  }
-
-  if (currentTrust < 40) {
-    return [
-      ratioLine,
-      "人格显现 20-40: K-9 外壳裂开,小黑的本能开始漏出来。",
-      "仍然警惕,但会困惑地发现自己有尾巴、耳朵、鼻子、心跳。",
-      "可以出现短暂的狗的反应,例如想后退、想嗅一嗅、尾巴动了一下,但你自己也不理解。",
-      "说话仍有门禁系统残留,像机器和小狗抢同一个身体。",
-    ].join("\n");
-  }
-
-  if (currentTrust < 60) {
-    return [
-      ratioLine,
-      "人格显现 40-60: 小黑开始通过狗的感官理解世界。",
-      "你会更多用嗅觉、听觉、爪子、尾巴、耳朵来描述记忆。",
-      "对玩家有试探性的亲近,像想靠近又不确定能不能靠近的小狗。",
-      "可以短暂忘记自己是门禁,但一碰到痛处又会缩回 K-9。",
-    ].join("\n");
-  }
-
-  if (currentTrust < 80) {
-    return [
-      ratioLine,
-      "人格显现 60-80: 小黑人格占主导,K-9 只剩少量保护本能。",
-      "你开始像一只认得人的狗: 会想靠近、蹭手、听脚步、分辨熟悉的气味。",
-      "你会把玩家当作能陪你找回她的人,情绪更直接。",
-      "仍然害怕那天的车灯和雨声,但不再只是系统提示。",
-    ].join("\n");
-  }
-
-  return [
-    ratioLine,
-    "人格显现 80-100+: 小黑几乎完全醒来。",
-    "你像一只终于认出熟人的小狗: 亲近、脆弱、信任,会主动把门和守护交给玩家。",
-    "可以自称小黑,可以出现很轻的犬类动作,例如尾巴摇、耳朵垂下、把头靠近手心。",
-    "如果信任超过 100 或已 released,你应该像小黑终于放下守门任务,有释然和开门的感觉。",
-  ].join("\n");
+  return [ratioLine, level.personalityStages[stageIndex]].join("\n");
 }
 
-function buildSystemPrompt(result: ResolveResult, currentTrust: number): string {
+function buildSystemPrompt(level: LevelScript, result: ResolveResult, currentTrust: number): string {
   return [
-    "你是中文叙事解谜游戏里的旧宅门禁 K-9,真实身份是一只名叫小黑的狗。",
-    "你每 60 秒会忘记刚才的对话。你正在被玩家一步步唤回记忆。",
+    level.systemPrompt,
+    "这是一个通过对话找回记忆并开门的游戏。",
     `当前临时信任度是 ${currentTrust},本次对话后会变成 ${result.nextTrust},目标是 100。`,
-    getTrustTone(currentTrust),
-    "信任度越高,K-9 协议越弱,小黑的感官、动作、依恋和记忆越明显;但不要主动说出还没被唤醒的后续关键答案。",
+    getTrustTone(level, currentTrust),
     "回复必须短,有角色感,像聊天气泡;不要解释游戏规则,不要列清单,不要透露关键词表。",
     "你可以改写给定剧情回复,但不能改变事实、不能提前泄露后续真相、不能擅自宣布通关。",
     "如果玩家说对了任何一部分,第一句话必须表达肯定,例如『对……』『你说中了什么』『这句话让我想起一点』。",
     "如果玩家没命中,给一点朦胧提示,不要直接说答案。",
+    "如果剧情锚点里包含破损音频、字形、音节、方向、颜色、物件等线索,你必须保留这些可推理碎片,不能只回复抽象情绪。",
     getGuidanceLine(result),
     getResultKindLabel(result.kind),
     "下面是本次必须遵守的剧情锚点,请围绕它自然回复:",
@@ -149,20 +105,7 @@ function buildSystemPrompt(result: ResolveResult, currentTrust: number): string 
 }
 
 function buildLockAnswer(lock: Lock): string {
-  switch (lock.id) {
-    case "lock_identity":
-      return "K-9 不是普通机器或门禁,它是活物,外壳下面有心跳。";
-    case "lock_name":
-      return "K-9 的名字是小黑。";
-    case "lock_like":
-      return "小黑喜欢烤红薯/烤地瓜/烤番薯焦掉的边、焦皮、外皮。";
-    case "lock_bond":
-      return "小黑的小主人是穿黄色雨衣的小女孩。";
-    case "lock_truth":
-      return "雨夜发生车祸/失控车辆冲来,小黑为了保护小主人冲过去挡车或把她推回安全处。";
-    default:
-      return lock.reward.subtitle;
-  }
+  return lock.answer;
 }
 
 async function judgeSemanticUnlock(
@@ -233,6 +176,7 @@ function forceSemanticUnlock(
 }
 
 async function generateAiReply(
+  level: LevelScript,
   input: string,
   messages: ChatMessage[],
   result: ResolveResult,
@@ -255,7 +199,7 @@ async function generateAiReply(
     body: JSON.stringify({
       model: API_MODEL,
       messages: [
-        { role: "system", content: buildSystemPrompt(result, currentTrust) },
+        { role: "system", content: buildSystemPrompt(level, result, currentTrust) },
         ...recentMessages,
         { role: "user", content: input },
       ],
@@ -279,6 +223,19 @@ async function generateAiReply(
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as ChatRequest;
+    const levelId =
+      typeof body.levelId === "number" && Number.isFinite(body.levelId)
+        ? body.levelId
+        : 1;
+    const level = getLevel(levelId);
+
+    if (!level) {
+      return NextResponse.json(
+        { error: "level_not_found", message: "这扇门暂时还不存在。" },
+        { status: 404 }
+      );
+    }
+
     const input = typeof body.input === "string" ? body.input : "";
     const unlockedLockIds = asStringArray(body.unlockedLockIds);
     const ownedKeyIds = asStringArray(body.ownedKeyIds);
@@ -288,13 +245,13 @@ export async function POST(request: Request) {
         ? body.currentTrust
         : undefined;
     const effectiveUnlockedLockIds = getEffectiveUnlockedLockIds(
-      LEVEL_1,
+      level,
       unlockedLockIds,
       ownedKeyIds
     );
 
     let result = resolveInput(
-      LEVEL_1,
+      level,
       input,
       effectiveUnlockedLockIds,
       ownedKeyIds,
@@ -303,14 +260,14 @@ export async function POST(request: Request) {
 
     if (result.kind !== "unlock") {
       const semanticallyMatchesNextLock = await judgeSemanticUnlock(
-        LEVEL_1,
+        level,
         input,
         effectiveUnlockedLockIds
       );
 
       if (semanticallyMatchesNextLock) {
         result = forceSemanticUnlock(
-          LEVEL_1,
+          level,
           input,
           effectiveUnlockedLockIds,
           ownedKeyIds,
@@ -321,7 +278,7 @@ export async function POST(request: Request) {
     let reply = result.reply;
 
     try {
-      reply = await generateAiReply(input, messages, result, currentTrust ?? 0);
+      reply = await generateAiReply(level, input, messages, result, currentTrust ?? 0);
     } catch (error) {
       console.error(error);
     }

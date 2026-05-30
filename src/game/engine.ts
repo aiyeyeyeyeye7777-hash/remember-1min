@@ -80,20 +80,7 @@ function findInsightLock(
 }
 
 function buildInsightReply(lock: Lock): string {
-  switch (lock.id) {
-    case "lock_identity":
-      return "……你说得对,这不像一台机器该有的感觉。我的外壳下面有声音,一下、一下地跳。";
-    case "lock_name":
-      return "你说到了名字。那个声音好像真的在喊我,只是我还隔着一层雾,听不完整。";
-    case "lock_like":
-      return "对,这是很近的记忆。热的、甜的,还有一点焦味。她好像总把什么掰给我。";
-    case "lock_bond":
-      return "你说的『她』很重要。我看不清脸,但我记得雨水、亮亮的颜色,还有一双小小的手。";
-    case "lock_truth":
-      return "……对,那天有危险。雨声很大,车灯很亮。你说的事扎到了最里面,但我还不敢一次全想起来。";
-    default:
-      return lock.lockedHint;
-  }
+  return lock.insightReply;
 }
 
 function maybeRelease(
@@ -200,7 +187,7 @@ export function resolveInput(
 
   const insightLock = findInsightLock(level, trimmed, unlockedLockIds);
   if (insightLock) {
-    const trustDelta = 9;
+    const trustDelta = Math.max(9, Math.round(insightLock.trustBoost * 0.45));
     const nextTrust = clampTrust(currentTrust + trustDelta);
     const release = maybeRelease(level, buildInsightReply(insightLock), nextTrust);
 
