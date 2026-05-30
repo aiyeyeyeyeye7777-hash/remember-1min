@@ -19,7 +19,7 @@ export function MessageBubble({
   if (msg.speaker === "system") {
     return (
       <div className="my-2 flex justify-center animate-fadeup">
-        <span className="rounded-full bg-panelSoft/70 px-3 py-1 text-[10px] text-gray-400 border border-line">
+        <span className="pixel-panel rounded-full bg-panelSoft/70 px-3 py-1 text-[10px] text-gray-400 border border-line">
           {msg.text}
         </span>
       </div>
@@ -43,7 +43,7 @@ export function MessageBubble({
           isMe
             ? "bg-me text-gray-100 rounded-br-sm"
             : "bg-ai text-gray-200 rounded-bl-sm",
-          unlocked ? "border border-accent animate-keyglow" : "border border-transparent",
+          unlocked ? "border border-accent animate-keyglow pixel-panel" : "border border-transparent",
         ].join(" ")}
       >
         {msg.text}

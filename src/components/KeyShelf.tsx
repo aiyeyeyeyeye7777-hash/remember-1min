@@ -36,7 +36,7 @@ export function KeyShelf({
               disabled={!owned || disabled}
               onClick={() => owned && onSend(k.autoSend)}
               className={[
-                "flex w-[118px] shrink-0 flex-col rounded-xl border px-2.5 py-2 text-left transition active:scale-[0.97]",
+                "pixel-panel flex w-[118px] shrink-0 flex-col rounded-xl border px-2.5 py-2 text-left transition active:scale-[0.97]",
                 owned
                   ? "border-accent/60 bg-gradient-to-b from-accent/15 to-panel text-gray-100 hover:border-accent"
                   : "border-line bg-panel/60 text-gray-600 cursor-not-allowed",

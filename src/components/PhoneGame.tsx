@@ -68,7 +68,7 @@ export function PhoneGame({
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full bg-accent animate-flash" />
-                  <h1 className="text-[15px] font-bold text-gray-100">{state.trust >= 80 ? level.awakenedName : level.aiName}</h1>
+                  <h1 className="terminal-title text-[15px] font-bold text-gray-100">{state.trust >= 80 ? level.awakenedName : level.aiName}</h1>
                   <span className="truncate text-[10px] text-gray-500">· {level.title}</span>
                 </div>
                 <p className="mt-0.5 text-[10px] text-gray-500">
@@ -160,6 +160,8 @@ export function PhoneGame({
           <PromptChips
             nextLock={nextLock}
             stuckRounds={nextLock ? state.save.stuckRoundsByLockId[nextLock.id] ?? 0 : 0}
+            attempts={nextLock ? state.save.attemptsByLockId[nextLock.id] ?? 0 : 0}
+            slotHitIds={nextLock ? state.save.slotHitsByLockId[nextLock.id] ?? [] : []}
             disabled={state.thinking || state.cleared}
             onSend={send}
           />

@@ -6,6 +6,7 @@ import {
   getNextLock,
   getBaseTrust,
   lockIdOfKey,
+  getHitSlotIds,
   type ChatMessage,
 } from "./engine";
 import { requestChatReply } from "./chatApi";
@@ -70,6 +71,7 @@ export function useGame(level: LevelScript) {
   const pauseStartedAtRef = useRef<number | null>(null);
   const thinkingPauseStartedAtRef = useRef<number | null>(null);
   const resettingRef = useRef(false);
+  const offTrackCountRef = useRef(0);
 
   const saveRef = useRef(save);
   saveRef.current = save;
@@ -146,6 +148,7 @@ export function useGame(level: LevelScript) {
     roundEndsAtRef.current = Date.now() + level.memorySeconds * 1000;
     pauseStartedAtRef.current = null;
     thinkingPauseStartedAtRef.current = null;
+    offTrackCountRef.current = 0;
     timerStartedRef.current = false;
     setPaused(false);
     setPauseUsed(false);
@@ -256,6 +259,33 @@ export function useGame(level: LevelScript) {
         ownedKeyIds,
         unlockedLockIdsRef.current
       );
+      const currentLock = getNextLock(level, curLocks);
+      const hitSlotIds = currentLock ? getHitSlotIds(currentLock, text) : [];
+      const previousSlotHits = currentLock
+        ? saveRef.current.slotHitsByLockId[currentLock.id] ?? []
+        : [];
+      const nextSlotHitIds = Array.from(new Set([...previousSlotHits, ...hitSlotIds]));
+      const currentLockAttempts = currentLock
+        ? (saveRef.current.attemptsByLockId[currentLock.id] ?? 0) + 1
+        : 0;
+
+      if (currentLock) {
+        setSave((prev) => {
+          const next = {
+            ...prev,
+            attemptsByLockId: {
+              ...prev.attemptsByLockId,
+              [currentLock.id]: currentLockAttempts,
+            },
+            slotHitsByLockId: {
+              ...prev.slotHitsByLockId,
+              [currentLock.id]: nextSlotHitIds,
+            },
+          };
+          writeSave(next);
+          return next;
+        });
+      }
 
       requestChatReply({
         levelId: level.id,
@@ -264,9 +294,14 @@ export function useGame(level: LevelScript) {
         unlockedLockIds: curLocks,
         ownedKeyIds,
         currentTrust: trustRef.current,
+        offTrackCount: offTrackCountRef.current,
+        currentLockAttempts,
+        slotHitIds: nextSlotHitIds,
       })
         .then((result) => {
           endThinkingPause();
+          offTrackCountRef.current =
+            result.kind === "fallback" ? offTrackCountRef.current + 1 : 0;
           setTrust(result.nextTrust);
           if (result.unlockedLock) {
             const lock = result.unlockedLock;
@@ -281,9 +316,17 @@ export function useGame(level: LevelScript) {
               const next = {
                 ...prev,
                 ownedKeyIds: [...prev.ownedKeyIds, lock.reward.id],
+                attemptsByLockId: {
+                  ...prev.attemptsByLockId,
+                  [lock.id]: 0,
+                },
                 stuckRoundsByLockId: {
                   ...prev.stuckRoundsByLockId,
                   [lock.id]: 0,
+                },
+                slotHitsByLockId: {
+                  ...prev.slotHitsByLockId,
+                  [lock.id]: [],
                 },
               };
               writeSave(next);
@@ -332,6 +375,7 @@ export function useGame(level: LevelScript) {
     roundEndsAtRef.current = Date.now() + level.memorySeconds * 1000;
     pauseStartedAtRef.current = null;
     thinkingPauseStartedAtRef.current = null;
+    offTrackCountRef.current = 0;
     timerStartedRef.current = false;
     setThinking(false);
     setPaused(false);

@@ -60,10 +60,10 @@ function LevelGrid({
   return (
     <div className="relative flex h-full flex-col bg-gradient-to-b from-panel to-[#090c11] px-5 py-6">
       <header className="shrink-0">
-        <p className="text-[10px] font-semibold tracking-[0.32em] text-accent/80">
+        <p className="terminal-title text-[10px] font-semibold tracking-[0.32em] text-accent/80">
           REMEMBER 1 MIN
         </p>
-        <h1 className="mt-2 text-2xl font-bold text-gray-100">
+        <h1 className="terminal-title mt-2 text-2xl font-bold text-gray-100">
           我只能记住你一分钟
         </h1>
         <p className="mt-2 text-[12px] leading-relaxed text-gray-500">
@@ -77,7 +77,7 @@ function LevelGrid({
             return (
               <div
                 key={`locked-${index}`}
-                className="rounded-2xl border border-dashed border-line bg-panelSoft/35 p-3 opacity-70"
+                className="pixel-panel rounded-2xl border border-dashed border-line bg-panelSoft/35 p-3 opacity-70"
               >
                 <div className="flex h-full flex-col items-center justify-center text-center">
                   <div className="text-2xl">🔒</div>
@@ -101,7 +101,7 @@ function LevelGrid({
               key={level.id}
               type="button"
               onClick={() => onSelect(level)}
-              className="group rounded-2xl border border-line bg-panelSoft/70 p-3 text-left transition hover:-translate-y-0.5 hover:border-accent/60 hover:bg-panelSoft active:scale-[0.99]"
+              className="signal-card pixel-panel group rounded-2xl border border-line bg-panelSoft/70 p-3 text-left transition hover:-translate-y-0.5 hover:border-accent/60 hover:bg-panelSoft active:scale-[0.99]"
             >
               <div className="flex items-center justify-between">
                 <GuardianAvatar
@@ -135,9 +135,9 @@ function LevelGrid({
       <button
         type="button"
         onClick={onOpenStories}
-        className="absolute bottom-5 right-5 rounded-full border border-accent/50 bg-accent px-4 py-2 text-[12px] font-bold text-panel shadow-[0_0_22px_rgba(245,166,35,0.25)] transition active:scale-95"
+        className="terminal-title absolute bottom-5 right-5 rounded-full border border-accent/50 bg-accent px-4 py-2 text-[12px] font-bold text-panel shadow-[0_0_22px_rgba(245,166,35,0.25)] transition active:scale-95"
       >
-        故事集
+        回收档案
       </button>
     </div>
   );
@@ -162,9 +162,9 @@ function StoryCollection({
         >
           ← 选关
         </button>
-        <h1 className="mt-4 text-2xl font-bold text-gray-100">故事集</h1>
+        <h1 className="terminal-title mt-4 text-2xl font-bold text-gray-100">回收档案</h1>
         <p className="mt-2 text-[12px] text-gray-500">
-          通关后的完整故事会收录在这里。
+          通关后的完整故事会作为旧世界记忆归档。
         </p>
       </header>
 
@@ -183,7 +183,7 @@ function StoryCollection({
                 className={[
                   "flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition active:scale-[0.99]",
                   cleared
-                    ? "border-accent/45 bg-panelSoft hover:border-accent"
+                    ? "signal-card pixel-panel border-accent/45 bg-panelSoft hover:border-accent"
                     : "cursor-not-allowed border-line bg-panelSoft/35 opacity-55",
                 ].join(" ")}
               >
@@ -227,7 +227,7 @@ function StoryDetail({
           onClick={onBack}
           className="rounded-full border border-line px-3 py-1 text-[11px] text-gray-500 transition hover:border-accent/50 hover:text-accent active:scale-95"
         >
-          ← 故事集
+          ← 回收档案
         </button>
         <div className="mt-4 flex items-center gap-3">
           <GuardianAvatar
@@ -238,7 +238,7 @@ function StoryDetail({
           />
           <div className="min-w-0">
             <div className="text-[10px] text-accent">第 {level.id} 关</div>
-            <h1 className="truncate text-xl font-bold text-gray-100">
+            <h1 className="terminal-title truncate text-xl font-bold text-gray-100">
               {level.ending.storyTitle ?? level.title}
             </h1>
           </div>
@@ -246,7 +246,7 @@ function StoryDetail({
       </header>
 
       <div className="no-scrollbar flex-1 overflow-y-auto px-5 py-5">
-        <div className="rounded-2xl border border-accent/25 bg-panelSoft/75 p-4">
+        <div className="pixel-panel rounded-2xl border border-accent/25 bg-panelSoft/75 p-4">
           <p className="text-[11px] text-gray-500">{level.ending.letterLabel}</p>
           <div className="mt-3 space-y-1 text-[15px] font-semibold leading-relaxed text-gray-100">
             {level.ending.letterLines.map((line) => (

@@ -17,6 +17,16 @@ export interface MemoryKey {
   emoji: string;
 }
 
+export interface AnswerSlot {
+  id: string;
+  /** UI 上点亮后显示的答案文本 */
+  answer: string;
+  /** 未点亮时随尝试次数逐渐变明确的空格提示 */
+  placeholders: [string, string, string, string];
+  /** 玩家说中这些词时,该空格会被点亮 */
+  keywords: string[];
+}
+
 /** 一重锁:需要玩家说出关键词才能解开,解开后获得对应钥匙 */
 export interface Lock {
   id: string;
@@ -28,6 +38,12 @@ export interface Lock {
   goalHint: string;
   /** 可展示给玩家的三层递进提示: 初始 / 卡 3 轮 / 卡 7 轮 */
   promptChips: [string, string, string];
+  /** 填空式目标模板,用 {slotId} 标记空格 */
+  answerPattern?: string;
+  /** 填空式目标里的空格定义 */
+  answerSlots?: AnswerSlot[];
+  /** AI 自适应提示,随当前锁尝试次数递进 */
+  adaptiveHints?: [string, string, string, string];
   /** 触发解锁的关键词数组,命中任意一个即可解锁 */
   keywords: string[];
   /** 当前锁的核心语义答案,用于 AI 语义判定 */

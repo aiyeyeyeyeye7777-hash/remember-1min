@@ -66,14 +66,14 @@ export function PhoneShell({
       )}
 
       <div
-        className="relative z-10"
+        className="relative z-10 overflow-hidden rounded-[34px]"
         style={{
           width: PHONE_WIDTH * phoneScale,
           height: PHONE_HEIGHT * phoneScale,
         }}
       >
         <div
-          className="flex flex-col overflow-hidden rounded-[34px] border border-accent/20 bg-panel shadow-[0_0_70px_rgba(245,166,35,0.22),0_28px_80px_rgba(0,0,0,0.7)]"
+          className="old-screen flex flex-col overflow-hidden rounded-[34px] border border-accent/25 bg-panel shadow-[0_0_70px_rgba(245,166,35,0.22),0_28px_80px_rgba(0,0,0,0.7)]"
           style={{
             width: PHONE_WIDTH,
             height: PHONE_HEIGHT,

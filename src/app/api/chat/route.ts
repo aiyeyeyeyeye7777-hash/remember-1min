@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getLevel } from "@/game/levels";
-import { getNextLock, lockIdOfKey, resolveInput } from "@/game/engine";
+import { getNextLock, getSlotHintLevel, lockIdOfKey, resolveInput } from "@/game/engine";
 import type { ChatMessage, ResolveResult } from "@/game/engine";
 import type { LevelScript, Lock } from "@/game/types";
 
@@ -16,6 +16,9 @@ interface ChatRequest {
   unlockedLockIds?: unknown;
   ownedKeyIds?: unknown;
   currentTrust?: unknown;
+  offTrackCount?: unknown;
+  currentLockAttempts?: unknown;
+  slotHitIds?: unknown;
 }
 
 function asStringArray(value: unknown): string[] {
@@ -86,7 +89,91 @@ function getTrustTone(level: LevelScript, currentTrust: number): string {
   return [ratioLine, level.personalityStages[stageIndex]].join("\n");
 }
 
-function buildSystemPrompt(level: LevelScript, result: ResolveResult, currentTrust: number): string {
+function getAdaptiveHintStage(result: ResolveResult, offTrackCount: number): 0 | 1 | 2 | 3 {
+  if (result.kind !== "fallback") return 0;
+  const currentOffTrackStreak = offTrackCount + 1;
+  if (currentOffTrackStreak >= 5) return 3;
+  if (currentOffTrackStreak >= 3) return 2;
+  if (currentOffTrackStreak >= 2) return 1;
+  return 0;
+}
+
+function formatSlotHint(lock: Lock, slotHitIds: string[], attempts: number): string {
+  if (!lock.answerPattern || !lock.answerSlots?.length) return "";
+  const hintLevel = getSlotHintLevel(attempts);
+  const slotLines = lock.answerSlots.map((slot) => {
+    const isHit = slotHitIds.includes(slot.id);
+    const display = isHit ? slot.answer : slot.placeholders[hintLevel];
+    return `${isHit ? "已点亮" : "未点亮"}「${slot.id}」=${display}`;
+  });
+  const visiblePattern = lock.answerSlots.reduce((pattern, slot) => {
+    const isHit = slotHitIds.includes(slot.id);
+    const display = isHit ? slot.answer : slot.placeholders[hintLevel];
+    return pattern.replace(`{${slot.id}}`, `【${display}】`);
+  }, lock.answerPattern);
+
+  return [
+    `填空式当前目标:${visiblePattern}`,
+    `当前锁累计问答次数:${attempts}`,
+    `空格状态:${slotLines.join("；")}`,
+  ].join("\n");
+}
+
+function buildAdaptiveHintLine(
+  level: LevelScript,
+  result: ResolveResult,
+  unlockedLockIds: string[],
+  offTrackCount: number,
+  currentLockAttempts: number,
+  slotHitIds: string[]
+): string {
+  const nextLock = getNextLock(level, unlockedLockIds);
+  if (!nextLock) {
+    return "自适应难度:当前没有待解开的锁,不要额外提示。";
+  }
+
+  const hintLevel = getSlotHintLevel(currentLockAttempts);
+  const slotHint = formatSlotHint(nextLock, slotHitIds, currentLockAttempts);
+  const hasAnySlotHit = slotHitIds.length > 0;
+  const scriptHint =
+    nextLock.adaptiveHints?.[hintLevel] ??
+    nextLock.promptChips[Math.min(hintLevel, 2)] ??
+    nextLock.lockedHint;
+  const hintStage = Math.max(getAdaptiveHintStage(result, offTrackCount), hintLevel) as
+    | 0
+    | 1
+    | 2
+    | 3;
+  const stageRule =
+    hintStage === 0
+      ? "玩家刚开始探索。保持含蓄,但要让回复落在当前空格方向上。"
+      : hintStage === 1
+      ? "玩家已经尝试多次。保持角色口吻,明确指出当前还缺哪个空格类型。"
+      : hintStage === 2
+      ? "玩家已经卡住。保持角色口吻,给出更具体的空格形状,让玩家知道要填几个要素。"
+      : "玩家已经严重卡住。保持角色口吻,几乎把空格答案放到嘴边,但不要直接宣布解锁。";
+
+  return [
+    `自适应难度等级:${hintStage}/3。`,
+    stageRule,
+    hasAnySlotHit
+      ? "玩家已经说中了至少一个空格。回复第一句必须明确肯定被点亮的空格,再引导剩下未点亮的空格。"
+      : "如果玩家没说中空格,不要只原地复述,要推进到下一层空格提示。",
+    `当前应引导的问题:${nextLock.goalHint}`,
+    slotHint,
+    `可融入台词的递进提示:${scriptHint}`,
+  ].join("\n");
+}
+
+function buildSystemPrompt(
+  level: LevelScript,
+  result: ResolveResult,
+  currentTrust: number,
+  unlockedLockIds: string[],
+  offTrackCount: number,
+  currentLockAttempts: number,
+  slotHitIds: string[]
+): string {
   return [
     level.systemPrompt,
     "这是一个通过对话找回记忆并开门的游戏。",
@@ -97,6 +184,14 @@ function buildSystemPrompt(level: LevelScript, result: ResolveResult, currentTru
     "如果玩家说对了任何一部分,第一句话必须表达肯定,例如『对……』『你说中了什么』『这句话让我想起一点』。",
     "如果玩家没命中,给一点朦胧提示,不要直接说答案。",
     "如果剧情锚点里包含破损音频、字形、音节、方向、颜色、物件等线索,你必须保留这些可推理碎片,不能只回复抽象情绪。",
+    buildAdaptiveHintLine(
+      level,
+      result,
+      unlockedLockIds,
+      offTrackCount,
+      currentLockAttempts,
+      slotHitIds
+    ),
     getGuidanceLine(result),
     getResultKindLabel(result.kind),
     "下面是本次必须遵守的剧情锚点,请围绕它自然回复:",
@@ -180,7 +275,11 @@ async function generateAiReply(
   input: string,
   messages: ChatMessage[],
   result: ResolveResult,
-  currentTrust: number
+  currentTrust: number,
+  unlockedLockIds: string[],
+  offTrackCount: number,
+  currentLockAttempts: number,
+  slotHitIds: string[]
 ): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return result.reply;
@@ -199,7 +298,18 @@ async function generateAiReply(
     body: JSON.stringify({
       model: API_MODEL,
       messages: [
-        { role: "system", content: buildSystemPrompt(level, result, currentTrust) },
+        {
+          role: "system",
+          content: buildSystemPrompt(
+            level,
+            result,
+            currentTrust,
+            unlockedLockIds,
+            offTrackCount,
+            currentLockAttempts,
+            slotHitIds
+          ),
+        },
         ...recentMessages,
         { role: "user", content: input },
       ],
@@ -244,6 +354,16 @@ export async function POST(request: Request) {
       typeof body.currentTrust === "number" && Number.isFinite(body.currentTrust)
         ? body.currentTrust
         : undefined;
+    const offTrackCount =
+      typeof body.offTrackCount === "number" && Number.isFinite(body.offTrackCount)
+        ? Math.max(0, Math.min(12, Math.floor(body.offTrackCount)))
+        : 0;
+    const currentLockAttempts =
+      typeof body.currentLockAttempts === "number" &&
+      Number.isFinite(body.currentLockAttempts)
+        ? Math.max(0, Math.min(99, Math.floor(body.currentLockAttempts)))
+        : 0;
+    const slotHitIds = asStringArray(body.slotHitIds);
     const effectiveUnlockedLockIds = getEffectiveUnlockedLockIds(
       level,
       unlockedLockIds,
@@ -278,7 +398,17 @@ export async function POST(request: Request) {
     let reply = result.reply;
 
     try {
-      reply = await generateAiReply(level, input, messages, result, currentTrust ?? 0);
+      reply = await generateAiReply(
+        level,
+        input,
+        messages,
+        result,
+        currentTrust ?? 0,
+        effectiveUnlockedLockIds,
+        offTrackCount,
+        currentLockAttempts,
+        slotHitIds
+      );
     } catch (error) {
       console.error(error);
     }

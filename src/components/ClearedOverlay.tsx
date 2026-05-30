@@ -17,8 +17,8 @@ export function ClearedOverlay({
   return (
     <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-panel/88 px-6 text-center backdrop-blur-[2px] animate-fadeup">
       <div className="text-5xl">✉️</div>
-      <h2 className="mt-4 text-lg font-bold text-accent">{ending.title}</h2>
-      <div className="mt-4 rounded-2xl border border-accent/35 bg-panelSoft/95 px-5 py-4 text-left shadow-xl">
+      <h2 className="terminal-title mt-4 text-lg font-bold text-accent">{ending.title}</h2>
+      <div className="pixel-panel mt-4 rounded-2xl border border-accent/35 bg-panelSoft/95 px-5 py-4 text-left shadow-xl">
         <p className="text-[11px] text-gray-500">{ending.letterLabel}</p>
         <p className="mt-3 text-[16px] font-semibold leading-relaxed text-gray-100">
           {ending.letterLines.map((line) => (
@@ -32,7 +32,7 @@ export function ClearedOverlay({
       <p className="mt-4 text-[12px] leading-relaxed text-gray-400">
         {ending.narration}
       </p>
-      <div className="mt-5 rounded-xl border border-line bg-panelSoft px-4 py-2 text-[11px] text-gray-400">
+      <div className="pixel-panel mt-5 rounded-xl border border-line bg-panelSoft px-4 py-2 text-[11px] text-gray-400">
         你陪它经历了 <span className="text-accent font-semibold">{rounds}</span> 次记忆清空，
         <br />
         才在一分钟里唤醒了它。

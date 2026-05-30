@@ -9,6 +9,9 @@ export async function requestChatReply({
   unlockedLockIds,
   ownedKeyIds,
   currentTrust,
+  offTrackCount,
+  currentLockAttempts,
+  slotHitIds,
 }: {
   levelId: number;
   input: string;
@@ -16,6 +19,9 @@ export async function requestChatReply({
   unlockedLockIds: string[];
   ownedKeyIds: string[];
   currentTrust: number;
+  offTrackCount: number;
+  currentLockAttempts: number;
+  slotHitIds: string[];
 }): Promise<ChatApiResult> {
   const response = await fetch("/api/chat", {
     method: "POST",
@@ -27,6 +33,9 @@ export async function requestChatReply({
       unlockedLockIds,
       ownedKeyIds,
       currentTrust,
+      offTrackCount,
+      currentLockAttempts,
+      slotHitIds,
     }),
   });
 

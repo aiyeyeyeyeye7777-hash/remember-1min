@@ -14,10 +14,14 @@ export interface SaveData {
   rounds: number;
   /** 每个锁尚未解开时经历了多少次记忆清空,用于递进提示 */
   stuckRoundsByLockId: Record<string, number>;
+  /** 每个锁累计问答次数,不随 60 秒记忆清空重置 */
+  attemptsByLockId: Record<string, number>;
+  /** 每个锁已被玩家说中的填空项,不随 60 秒记忆清空重置 */
+  slotHitsByLockId: Record<string, string[]>;
   updatedAt: number;
 }
 
-const KEY_PREFIX = "remember1min:save:";
+const KEY_PREFIX = "remember1min:v5:save:";
 
 export function storageKey(levelId: number): string {
   return `${KEY_PREFIX}${levelId}`;
@@ -30,6 +34,8 @@ export function loadSave(levelId: number): SaveData {
     cleared: false,
     rounds: 0,
     stuckRoundsByLockId: {},
+    attemptsByLockId: {},
+    slotHitsByLockId: {},
     updatedAt: Date.now(),
   };
   if (typeof window === "undefined") return fallback;
@@ -50,6 +56,31 @@ export function loadSave(levelId: number): SaveData {
               Object.entries(parsed.stuckRoundsByLockId).filter(
                 ([, value]) => typeof value === "number"
               )
+            )
+          : {},
+      attemptsByLockId:
+        parsed.attemptsByLockId &&
+        typeof parsed.attemptsByLockId === "object" &&
+        !Array.isArray(parsed.attemptsByLockId)
+          ? Object.fromEntries(
+              Object.entries(parsed.attemptsByLockId).filter(
+                ([, value]) => typeof value === "number"
+              )
+            )
+          : {},
+      slotHitsByLockId:
+        parsed.slotHitsByLockId &&
+        typeof parsed.slotHitsByLockId === "object" &&
+        !Array.isArray(parsed.slotHitsByLockId)
+          ? Object.fromEntries(
+              Object.entries(parsed.slotHitsByLockId)
+                .filter(([, value]) => Array.isArray(value))
+                .map(([key, value]) => [
+                  key,
+                  (value as unknown[]).filter(
+                    (item): item is string => typeof item === "string"
+                  ),
+                ])
             )
           : {},
       updatedAt: typeof parsed.updatedAt === "number" ? parsed.updatedAt : Date.now(),

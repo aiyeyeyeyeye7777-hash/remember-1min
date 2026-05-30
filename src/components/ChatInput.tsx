@@ -35,13 +35,13 @@ export function ChatInput({
             submit();
           }
         }}
-        className="no-scrollbar max-h-24 flex-1 resize-none rounded-2xl border border-line bg-panelSoft px-3.5 py-2 text-[13.5px] text-gray-100 outline-none placeholder:text-gray-600 focus:border-accent/60 disabled:opacity-50"
+        className="pixel-panel no-scrollbar max-h-24 flex-1 resize-none rounded-2xl border border-line bg-panelSoft px-3.5 py-2 text-[13.5px] text-gray-100 outline-none placeholder:text-gray-600 focus:border-accent/60 disabled:opacity-50"
       />
       <button
         type="button"
         onClick={submit}
         disabled={disabled || !value.trim()}
-        className="mb-0.5 h-9 shrink-0 rounded-full bg-accent px-4 text-[13px] font-semibold text-panel transition active:scale-95 disabled:opacity-30"
+        className="terminal-title mb-0.5 h-9 shrink-0 rounded-full bg-accent px-4 text-[13px] font-semibold text-panel transition active:scale-95 disabled:opacity-30"
       >
         发送
       </button>

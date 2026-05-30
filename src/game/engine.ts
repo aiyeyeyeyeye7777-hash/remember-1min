@@ -40,7 +40,7 @@ export function normalize(text: string): string {
     .replace(/[\s,。，！!？?、.~…·\-—_"'`「」『』()（）【】\[\]]/g, "");
 }
 
-function hitsAny(input: string, keywords: string[]): boolean {
+export function hitsAny(input: string, keywords: string[]): boolean {
   const n = normalize(input);
   return keywords.some((k) => n.includes(normalize(k)));
 }
@@ -247,4 +247,18 @@ export function getAllKeys(level: LevelScript): MemoryKey[] {
 /** 由钥匙 id 反查它属于哪重锁 */
 export function lockIdOfKey(level: LevelScript, keyId: string): string | undefined {
   return level.locks.find((l) => l.reward.id === keyId)?.id;
+}
+
+export function getSlotHintLevel(attempts: number): 0 | 1 | 2 | 3 {
+  if (attempts >= 8) return 3;
+  if (attempts >= 4) return 2;
+  if (attempts >= 0) return 1;
+  return 1;
+}
+
+export function getHitSlotIds(lock: Lock, input: string): string[] {
+  if (!lock.answerSlots?.length) return [];
+  return lock.answerSlots
+    .filter((slot) => hitsAny(input, slot.keywords))
+    .map((slot) => slot.id);
 }
